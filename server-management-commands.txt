@@ -1,0 +1,159 @@
+旧笔记本服务器常用管理指令
+================================
+
+1. 从 Windows PowerShell 登录服务器
+-----------------------------------
+
+ssh home-server
+
+
+2. 查看网站文件
+---------------
+
+cd /home/zx/money-web
+ls -la
+
+
+3. 查看服务是否正常
+-------------------
+
+systemctl is-active money-web cloudflared ssh
+
+详细状态：
+
+systemctl status money-web
+systemctl status cloudflared
+systemctl status ssh
+
+
+4. 重启服务
+-----------
+
+sudo systemctl restart money-web
+sudo systemctl restart cloudflared
+sudo systemctl restart ssh
+
+
+5. 查看日志
+-----------
+
+journalctl -u money-web -n 100 --no-pager
+journalctl -u cloudflared -n 100 --no-pager
+journalctl -u ssh -n 100 --no-pager
+
+实时查看 Cloudflare Tunnel 日志：
+
+journalctl -u cloudflared -f
+
+退出实时日志：
+
+Ctrl + C
+
+
+6. 检查端口
+-----------
+
+ss -ltnp
+
+只看 SSH 和网站端口：
+
+ss -ltnp | grep -E '(:22|:4174)'
+
+
+7. 检查本地网站是否正常
+-----------------------
+
+curl -I http://127.0.0.1:4174/index.html
+
+正常会看到类似：
+
+HTTP/1.0 200 OK
+
+
+8. 查看系统资源
+---------------
+
+查看磁盘空间：
+
+df -h
+
+查看内存：
+
+free -h
+
+查看系统负载和进程：
+
+top
+
+退出 top：
+
+q
+
+
+9. 更新系统
+-----------
+
+sudo apt update
+sudo apt upgrade
+
+
+10. 重启或关机
+--------------
+
+重启旧笔记本：
+
+sudo reboot
+
+关机：
+
+sudo shutdown now
+
+
+11. 从 Windows 上传网站文件
+---------------------------
+
+在 Windows PowerShell 中，进入网页项目目录后运行：
+
+scp .\index.html home-server:/home/zx/money-web/
+scp .\styles.css home-server:/home/zx/money-web/
+scp .\script.js home-server:/home/zx/money-web/
+
+上传后登录服务器并重启网站服务：
+
+ssh home-server
+sudo systemctl restart money-web
+
+
+12. 网站和管理入口
+------------------
+
+网站地址：
+
+https://money.zx8592.top
+
+SSH 管理入口：
+
+https://ssh.zx8592.top
+
+PowerShell 登录别名：
+
+ssh home-server
+
+
+13. 常见排查顺序
+----------------
+
+如果网站打不开：
+
+systemctl is-active money-web cloudflared ssh
+curl -I http://127.0.0.1:4174/index.html
+journalctl -u money-web -n 100 --no-pager
+journalctl -u cloudflared -n 100 --no-pager
+
+如果 SSH 连不上：
+
+systemctl status ssh
+systemctl status cloudflared
+journalctl -u ssh -n 100 --no-pager
+journalctl -u cloudflared -n 100 --no-pager
+

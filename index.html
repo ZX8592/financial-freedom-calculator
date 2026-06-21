@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>财务目标工作年限计算器</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="input-panel" aria-labelledby="app-title">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">Lifetime Work Calculator</p>
+            <h1 id="app-title">财务自由工作年限</h1>
+          </div>
+          <div class="quick-settings" id="quickSettings">
+            <button
+              class="preset-button"
+              id="presetMenuButton"
+              type="button"
+              title="快速设置"
+              aria-label="打开快速设置"
+              aria-expanded="false"
+              aria-controls="presetPanel"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h10" />
+                <path d="M18 7h2" />
+                <path d="M4 17h2" />
+                <path d="M10 17h10" />
+                <rect x="14" y="4" width="4" height="6" rx="1.2" />
+                <rect x="6" y="14" width="4" height="6" rx="1.2" />
+              </svg>
+            </button>
+            <div class="preset-panel" id="presetPanel" hidden>
+              <div class="preset-panel-heading">
+                <strong>快速设置</strong>
+                <span>保存并切换不同人生方案</span>
+              </div>
+              <div class="preset-list" id="presetList"></div>
+              <div class="preset-save-row">
+                <input id="presetName" type="text" maxlength="18" placeholder="新方案名称" aria-label="方案名称" />
+                <button id="savePresetButton" class="secondary-button" type="button">保存当前</button>
+              </div>
+              <p class="preset-status" id="presetStatus" role="status"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="inflation-alert" id="inflationAlert">
+          <div>
+            <strong>重要假设</strong>
+            <span>所有金额都按今天购买力填写，模型不考虑通货膨胀，也不要混入未来涨价后的金额。</span>
+          </div>
+          <button id="dismissInflationAlert" class="alert-close" type="button" aria-label="关闭重要假设提醒">×</button>
+        </div>
+
+        <form id="calculatorForm" class="form-grid">
+          <fieldset>
+            <legend>基础年龄</legend>
+            <label>
+              <span>工作起始年龄</span>
+              <input id="startAge" type="number" min="0" max="100" step="1" value="22" />
+            </label>
+            <label>
+              <span>预计寿命年龄</span>
+              <input id="deathAge" type="number" min="1" max="130" step="1" value="85" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>收入与日常开销</legend>
+            <label>
+              <span>起始每月税后收入</span>
+              <input id="monthlyIncome" type="number" min="0" step="100" value="20000" />
+            </label>
+            <label>
+              <span>基础每月开销</span>
+              <input id="monthlyExpense" type="number" min="0" step="100" value="9000" />
+            </label>
+            <label>
+              <span>退休后每月被动收入</span>
+              <input id="passiveIncome" type="number" min="0" step="100" value="0" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>分段收入</legend>
+            <p class="field-note full-span">
+              起始收入从工作起始年龄生效；下面的阶段表示到达该年龄后，个人每月税后收入变为对应金额。
+            </p>
+            <div id="incomeStepList" class="dynamic-list full-span"></div>
+            <button id="addIncomeStepButton" class="secondary-button full-span" type="button">添加收入阶段</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>资产与目标</legend>
+            <label>
+              <span>起始可投资资产</span>
+              <input id="initialAssets" type="number" min="0" step="1000" value="50000" />
+            </label>
+            <label>
+              <span>工作期年化收益</span>
+              <div class="suffix-input">
+                <input id="workReturn" type="number" min="-99" max="100" step="0.1" value="5" />
+                <span>%</span>
+              </div>
+            </label>
+            <label>
+              <span>退休后年化收益</span>
+              <div class="suffix-input">
+                <input id="retireReturn" type="number" min="-99" max="100" step="0.1" value="4" />
+                <span>%</span>
+              </div>
+            </label>
+            <label>
+              <span>退休时一次性目标</span>
+              <input id="oneTimeGoal" type="number" min="0" step="1000" value="0" />
+            </label>
+            <label>
+              <span>去世时保留资产</span>
+              <input id="legacyGoal" type="number" min="0" step="1000" value="0" />
+            </label>
+            <label>
+              <span>安全垫</span>
+              <div class="suffix-input">
+                <input id="safetyMargin" type="number" min="0" max="200" step="1" value="10" />
+                <span>%</span>
+              </div>
+            </label>
+          </fieldset>
+
+          <fieldset data-scenario="home">
+            <legend>买房置业</legend>
+            <label class="scenario-toggle">
+              <input id="enableHome" type="checkbox" />
+              <span>纳入买房置业</span>
+            </label>
+            <label>
+              <span>买房年龄</span>
+              <input id="homeAge" type="number" min="0" max="130" step="1" value="30" />
+            </label>
+            <label>
+              <span>首付与税费</span>
+              <input id="homeDownPayment" type="number" min="0" step="10000" value="600000" />
+            </label>
+            <label>
+              <span>贷款总额</span>
+              <input id="mortgagePrincipal" type="number" min="0" step="10000" value="1300000" />
+            </label>
+            <label>
+              <span>贷款年利率</span>
+              <div class="suffix-input">
+                <input id="mortgageRate" type="number" min="0" max="100" step="0.01" value="4" />
+                <span>%</span>
+              </div>
+            </label>
+            <label>
+              <span>每月房贷</span>
+              <input id="mortgageMonthly" type="number" min="0" step="100" value="7000" />
+            </label>
+            <label>
+              <span>房贷年限</span>
+              <input id="mortgageYears" type="number" min="0" max="50" step="1" value="25" />
+            </label>
+            <p class="field-note full-span">
+              贷款总额、贷款年利率、每月房贷、房贷年限可留空其中一项，系统会用另外三项自动补齐；现金流按每月房贷计算。
+            </p>
+            <label>
+              <span>物业维护月开销</span>
+              <input id="homeMaintenanceMonthly" type="number" min="0" step="100" value="800" />
+            </label>
+          </fieldset>
+
+          <fieldset data-scenario="marriage">
+            <legend>结婚与家庭</legend>
+            <label class="scenario-toggle">
+              <input id="enableMarriage" type="checkbox" />
+              <span>纳入结婚家庭</span>
+            </label>
+            <label>
+              <span>结婚年龄</span>
+              <input id="marriageAge" type="number" min="0" max="130" step="1" value="28" />
+            </label>
+            <label>
+              <span>婚礼与安家支出</span>
+              <input id="weddingCost" type="number" min="0" step="1000" value="120000" />
+            </label>
+            <label>
+              <span>伴侣工作期月收入</span>
+              <input id="spouseIncome" type="number" min="0" step="100" value="12000" />
+            </label>
+            <label>
+              <span>家庭每月额外开销</span>
+              <input id="spouseExpense" type="number" min="0" step="100" value="5000" />
+            </label>
+          </fieldset>
+
+          <fieldset data-scenario="children">
+            <legend>生娃养育</legend>
+            <label class="scenario-toggle">
+              <input id="enableChildren" type="checkbox" />
+              <span>纳入生娃养育</span>
+            </label>
+            <input id="childAge" type="hidden" value="32" />
+            <label>
+              <span>孩子数量</span>
+              <input id="childCount" type="number" min="0" max="8" step="1" value="1" />
+            </label>
+            <div id="childBirthList" class="dynamic-list full-span"></div>
+            <label>
+              <span>生育一次性支出</span>
+              <input id="birthCost" type="number" min="0" step="1000" value="50000" />
+            </label>
+            <label>
+              <span>每个孩子每月养育支出</span>
+              <input id="childMonthlyCost" type="number" min="0" step="100" value="3500" />
+            </label>
+            <label>
+              <span>养育持续年数</span>
+              <input id="childSupportYears" type="number" min="0" max="40" step="1" value="22" />
+            </label>
+            <label>
+              <span>每个孩子教育储备</span>
+              <input id="educationCost" type="number" min="0" step="1000" value="200000" />
+            </label>
+            <label>
+              <span>教育储备发生在孩子几岁</span>
+              <input id="educationAge" type="number" min="0" max="40" step="1" value="12" />
+            </label>
+            <label>
+              <span>每个孩子彩礼/婚嫁支持</span>
+              <input id="childMarriageGift" type="number" min="0" step="1000" value="100000" />
+            </label>
+            <label>
+              <span>彩礼发生在孩子几岁</span>
+              <input id="childMarriageGiftAge" type="number" min="0" max="60" step="1" value="25" />
+            </label>
+          </fieldset>
+
+          <fieldset data-scenario="parents">
+            <legend>父母赡养</legend>
+            <label class="scenario-toggle">
+              <input id="enableParents" type="checkbox" />
+              <span>纳入父母赡养/照护</span>
+            </label>
+            <label>
+              <span>父母支出开始时你的年龄</span>
+              <input id="parentSupportStartAge" type="number" min="0" max="130" step="1" value="45" />
+            </label>
+            <label>
+              <span>父母支出结束时你的年龄</span>
+              <input id="parentSupportEndAge" type="number" min="0" max="130" step="1" value="75" />
+            </label>
+            <label>
+              <span>父母每月赡养/照护费</span>
+              <input id="parentMonthlySupport" type="number" min="0" step="100" value="3000" />
+            </label>
+            <label>
+              <span>父母一次性应急储备</span>
+              <input id="parentEmergencyFund" type="number" min="0" step="1000" value="100000" />
+            </label>
+            <label>
+              <span>应急储备发生时你的年龄</span>
+              <input id="parentEmergencyAge" type="number" min="0" max="130" step="1" value="60" />
+            </label>
+          </fieldset>
+
+          <fieldset data-scenario="medical">
+            <legend>养老储备</legend>
+            <label class="scenario-toggle">
+              <input id="enableMedicalReserve" type="checkbox" />
+              <span>纳入养老储备金</span>
+            </label>
+            <label class="scenario-toggle">
+              <input id="enableElderlyMedicalMonthly" type="checkbox" />
+              <span>纳入养老额外每月预算</span>
+            </label>
+            <label data-medical-group="reserve">
+              <span>养老储备开始年龄</span>
+              <input id="medicalReserveAge" type="number" min="0" max="130" step="1" value="65" />
+            </label>
+            <label data-medical-group="reserve">
+              <span>养老储备金</span>
+              <input id="medicalReserve" type="number" min="0" step="10000" value="500000" />
+            </label>
+            <label data-medical-group="monthly">
+              <span>养老额外月预算开始年龄</span>
+              <input id="elderlyMedicalStartAge" type="number" min="0" max="130" step="1" value="65" />
+            </label>
+            <label data-medical-group="monthly">
+              <span>养老额外每月预算</span>
+              <input id="elderlyMedicalMonthly" type="number" min="0" step="100" value="2000" />
+            </label>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="result-panel" aria-live="polite">
+        <div class="status-card" id="statusCard">
+          <div>
+            <p class="result-label">需要工作</p>
+            <p class="hero-result" id="workDuration">--</p>
+            <p class="result-subtitle" id="retireAge">输入参数后自动计算</p>
+          </div>
+          <div class="status-badge" id="statusBadge">计算中</div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>基础月结余</span>
+            <strong id="monthlySurplus">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>财务自由预计资产</span>
+            <strong id="requiredAssets">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>工作在人生占比</span>
+            <strong id="retireAssets">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>最高压力年龄段</span>
+            <strong id="peakOutflow">--</strong>
+          </article>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-heading">
+            <div>
+              <p class="result-label">资产轨迹</p>
+              <h2>人生事件后的资产变化</h2>
+            </div>
+            <div class="legend">
+              <span><i class="dot assets"></i>预计资产</span>
+              <span><i class="dot target"></i>退休门槛</span>
+            </div>
+          </div>
+          <canvas id="assetChart" width="980" height="560" aria-label="资产轨迹图"></canvas>
+        </div>
+
+        <div class="insight-grid">
+          <article>
+            <span>累计工作收入</span>
+            <strong id="totalIncome">--</strong>
+          </article>
+          <article>
+            <span>累计总支出</span>
+            <strong id="totalExpense">--</strong>
+          </article>
+          <article>
+            <span>人生事件支出</span>
+            <strong id="eventExpense">--</strong>
+          </article>
+          <article>
+            <span>养老储备金</span>
+            <strong id="medicalReserveDisplay">--</strong>
+          </article>
+        </div>
+
+        <div class="timeline-card">
+          <div class="timeline-heading">
+            <p class="result-label">时间线</p>
+            <h2>关键人生节点</h2>
+          </div>
+          <div class="timeline-list" id="eventTimeline"></div>
+        </div>
+
+        <div class="board-card">
+          <div class="board-heading">
+            <div>
+              <p class="result-label">图片看板</p>
+              <h2>生成可保存的规划摘要</h2>
+            </div>
+            <div class="board-actions">
+              <button id="generateBoardButton" class="primary-button" type="button">生成图片看板</button>
+              <a id="downloadBoardLink" class="download-button" download="financial-dashboard.png" hidden>下载 PNG</a>
+            </div>
+          </div>
+          <div class="board-preview-shell">
+            <img id="boardPreview" alt="" aria-hidden="true" hidden />
+            <p id="boardStatus" role="status">生成后将在这里预览，可保存为 PNG 图片。</p>
+          </div>
+        </div>
+
+        <footer class="site-footer">
+          <p>
+            <span>项目地址</span>
+            <a href="https://github.com/ZX8592/financial-freedom-calculator" target="_blank" rel="noreferrer">
+              ZX8592/financial-freedom-calculator
+            </a>
+          </p>
+          <p>
+            假设收入、开销、收益率均按当前输入保持不变；安全垫会放大生活、置业、家庭、养育、父母赡养和养老支出。所有金额均不考虑通货膨胀。
+          </p>
+        </footer>
+      </section>
+    </main>
+
+    <div class="mobile-page-indicator" aria-hidden="true">
+      <span class="active"></span>
+      <span></span>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
