@@ -21,8 +21,7 @@ const DEFAULTS = {
   enableMarriage: false,
   marriageAge: 28,
   weddingCost: 120000,
-  spouseIncome: 12000,
-  spouseExpense: 5000,
+  spouseContribution: 5000,
   enableChildren: false,
   childAge: 32,
   childCount: 1,
@@ -158,6 +157,10 @@ function readSavedParams() {
       values.incomeSteps = [];
     }
 
+    if (!("spouseContribution" in values)) {
+      values.spouseContribution = Math.max(0, toNumber(values.spouseIncome, 0) - toNumber(values.spouseExpense, 0));
+    }
+
     return values;
   } catch {
     return null;
@@ -200,6 +203,9 @@ function saveParams(params) {
 function normalizePresetValues(values) {
   const source = values && typeof values === "object" ? values : {};
   const merged = { ...DEFAULTS, ...source };
+  if (!("spouseContribution" in source)) {
+    merged.spouseContribution = Math.max(0, toNumber(source.spouseIncome, 0) - toNumber(source.spouseExpense, 0));
+  }
   merged.incomeSteps = sanitizeIncomeSteps(source.incomeSteps);
   merged.childBirthAges = normalizeChildBirthAges(
     source.childBirthAges,
@@ -530,7 +536,7 @@ function shortEventName(event) {
     房贷结束: "房贷止",
     物业维护开始: "物业",
     结婚安家: "结婚",
-    家庭收支变化: "家庭收支",
+    伴侣分担: "伴侣分担",
     父母赡养开始: "父母赡养",
     父母赡养结束: "赡养止",
     父母应急储备: "父母应急",
@@ -768,11 +774,11 @@ function buildLifeModel(params) {
 
   if (params.enableMarriage) {
     addOneTime("结婚安家", params.marriageAge, params.weddingCost, "家庭");
-    if (params.spouseIncome > 0 || params.spouseExpense > 0) {
+    if (params.spouseContribution > 0) {
       addTimelineEvent(
-        "家庭收支变化",
+        "伴侣分担",
         params.marriageAge,
-        `收入 +${formatCurrency(params.spouseIncome)}，开销 +${formatCurrency(params.spouseExpense)} / 月`,
+        `+${formatCurrency(params.spouseContribution)} / 月`,
         "家庭",
       );
     }
@@ -886,10 +892,6 @@ function futureEventExpenseAt(month, currentMonth, model) {
 function monthlyExpenseFor(month, params, model) {
   let expense = params.monthlyExpense;
 
-  if (month >= model.marriageMonth) {
-    expense += params.spouseExpense;
-  }
-
   if (month >= model.homeMonth) {
     expense += params.homeMaintenanceMonthly;
   }
@@ -927,7 +929,7 @@ function monthlyIncomeFor(month, phase, params, model) {
   });
 
   if (month >= model.marriageMonth) {
-    income += params.spouseIncome;
+    income += params.spouseContribution;
   }
 
   return Math.max(0, income);
