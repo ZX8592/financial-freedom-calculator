@@ -22,6 +22,7 @@ const DEFAULTS = {
   marriageAge: 28,
   weddingCost: 120000,
   spouseContribution: 5000,
+  spouseExpense: 5000,
   enableChildren: false,
   childAge: 32,
   childCount: 1,
@@ -157,10 +158,6 @@ function readSavedParams() {
       values.incomeSteps = [];
     }
 
-    if (!("spouseContribution" in values)) {
-      values.spouseContribution = Math.max(0, toNumber(values.spouseIncome, 0) - toNumber(values.spouseExpense, 0));
-    }
-
     return values;
   } catch {
     return null;
@@ -203,9 +200,6 @@ function saveParams(params) {
 function normalizePresetValues(values) {
   const source = values && typeof values === "object" ? values : {};
   const merged = { ...DEFAULTS, ...source };
-  if (!("spouseContribution" in source)) {
-    merged.spouseContribution = Math.max(0, toNumber(source.spouseIncome, 0) - toNumber(source.spouseExpense, 0));
-  }
   merged.incomeSteps = sanitizeIncomeSteps(source.incomeSteps);
   merged.childBirthAges = normalizeChildBirthAges(
     source.childBirthAges,
@@ -774,11 +768,11 @@ function buildLifeModel(params) {
 
   if (params.enableMarriage) {
     addOneTime("结婚安家", params.marriageAge, params.weddingCost, "家庭");
-    if (params.spouseContribution > 0) {
+    if (params.spouseContribution > 0 || params.spouseExpense > 0) {
       addTimelineEvent(
         "伴侣分担",
         params.marriageAge,
-        `+${formatCurrency(params.spouseContribution)} / 月`,
+        `分担 +${formatCurrency(params.spouseContribution)}，额外开销 +${formatCurrency(params.spouseExpense)} / 月`,
         "家庭",
       );
     }
@@ -891,6 +885,10 @@ function futureEventExpenseAt(month, currentMonth, model) {
 
 function monthlyExpenseFor(month, params, model) {
   let expense = params.monthlyExpense;
+
+  if (month >= model.marriageMonth) {
+    expense += params.spouseExpense;
+  }
 
   if (month >= model.homeMonth) {
     expense += params.homeMaintenanceMonthly;
