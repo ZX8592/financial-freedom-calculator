@@ -839,17 +839,20 @@ canvas {
     gap: 0;
     width: 100vw;
     margin: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     padding: 12px;
-    scroll-behavior: smooth;
-    scroll-padding-inline: 12px;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+    touch-action: pan-y;
+    transform: translateX(0);
+    transition: transform 260ms ease;
+    will-change: transform;
   }
 
-  .app-shell::-webkit-scrollbar {
-    display: none;
+  .app-shell[data-mobile-page="1"] {
+    transform: translateX(-100vw);
+  }
+
+  .app-shell.no-page-transition {
+    transition: none;
   }
 
   .input-panel,
@@ -858,8 +861,6 @@ canvas {
     width: calc(100vw - 24px);
     min-width: calc(100vw - 24px);
     padding: 16px;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
   }
 
   .input-panel {

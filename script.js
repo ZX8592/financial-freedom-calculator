@@ -93,11 +93,12 @@ let incomeSteps = [];
 let childBirthAges = [DEFAULTS.childAge];
 let latestResult = null;
 let boardGenerated = false;
-let mobileSnapTimer = 0;
 let mobileTouchActive = false;
 let mobileTouchStartX = 0;
+let mobileTouchStartY = 0;
 let mobileTouchStartPage = 0;
-let mobileSnapLockedUntil = 0;
+let mobilePage = 0;
+let mobileWheelLockedUntil = 0;
 
 function toNumber(value, fallback = 0) {
   const number = Number.parseFloat(value);
@@ -373,15 +374,8 @@ function isMobilePager() {
   return window.matchMedia("(max-width: 740px)").matches;
 }
 
-function mobileMaxScroll() {
-  if (!appShell) return 0;
-  return Math.max(0, appShell.scrollWidth - appShell.clientWidth);
-}
-
 function currentMobilePage() {
-  const maxScroll = mobileMaxScroll();
-  if (maxScroll <= 0) return 0;
-  return appShell.scrollLeft > maxScroll / 2 ? 1 : 0;
+  return mobilePage;
 }
 
 function updateMobilePageIndicator(page = currentMobilePage()) {
@@ -393,26 +387,18 @@ function updateMobilePageIndicator(page = currentMobilePage()) {
 
 function setMobilePage(page, behavior = "smooth") {
   if (!isMobilePager() || !appShell) return;
-  const maxScroll = mobileMaxScroll();
   const safePage = page === 1 ? 1 : 0;
-  const target = safePage === 1 ? maxScroll : 0;
-  appShell.scrollTo({ left: target, behavior });
+  mobilePage = safePage;
+  appShell.dataset.mobilePage = String(safePage);
+  appShell.classList.toggle("no-page-transition", behavior === "auto");
   updateMobilePageIndicator(safePage);
+  if (behavior === "auto") {
+    window.setTimeout(() => appShell.classList.remove("no-page-transition"), 0);
+  }
 }
 
 function snapMobilePage(page = currentMobilePage(), behavior = "smooth") {
   setMobilePage(page, behavior);
-}
-
-function scheduleMobileSnap() {
-  if (!isMobilePager()) return;
-  if (mobileTouchActive || Date.now() < mobileSnapLockedUntil) {
-    updateMobilePageIndicator();
-    return;
-  }
-  window.clearTimeout(mobileSnapTimer);
-  mobileSnapTimer = window.setTimeout(snapMobilePage, 120);
-  updateMobilePageIndicator();
 }
 
 function mobileSwipeThreshold() {
@@ -424,8 +410,8 @@ function handleMobileTouchStart(event) {
   if (!isMobilePager() || !event.touches.length) return;
   mobileTouchActive = true;
   mobileTouchStartX = event.touches[0].clientX;
+  mobileTouchStartY = event.touches[0].clientY;
   mobileTouchStartPage = currentMobilePage();
-  window.clearTimeout(mobileSnapTimer);
   updateMobilePageIndicator(mobileTouchStartPage);
 }
 
@@ -433,23 +419,36 @@ function handleMobileTouchEnd(event) {
   if (!isMobilePager() || !mobileTouchActive) return;
   const touch = event.changedTouches[0];
   const deltaX = touch ? touch.clientX - mobileTouchStartX : 0;
+  const deltaY = touch ? touch.clientY - mobileTouchStartY : 0;
   const threshold = mobileSwipeThreshold();
   let targetPage = mobileTouchStartPage;
 
-  if (Math.abs(deltaX) >= threshold) {
+  if (Math.abs(deltaX) >= threshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.15) {
     targetPage = deltaX < 0 ? 1 : 0;
   }
 
   mobileTouchActive = false;
-  mobileSnapLockedUntil = Date.now() + 360;
   snapMobilePage(targetPage);
 }
 
 function handleMobileTouchCancel() {
   if (!isMobilePager() || !mobileTouchActive) return;
   mobileTouchActive = false;
-  mobileSnapLockedUntil = Date.now() + 360;
   snapMobilePage(mobileTouchStartPage);
+}
+
+function handleMobileWheel(event) {
+  if (!isMobilePager()) return;
+  if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || Math.abs(event.deltaX) < 28) return;
+
+  event.preventDefault();
+  if (Date.now() < mobileWheelLockedUntil) return;
+
+  const targetPage = event.deltaX > 0 ? 1 : 0;
+  if (targetPage !== currentMobilePage()) {
+    snapMobilePage(targetPage);
+    mobileWheelLockedUntil = Date.now() + 520;
+  }
 }
 
 function numberValue(id) {
@@ -2002,13 +2001,13 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setPresetPanelOpen(false);
 });
 dismissInflationAlertButton.addEventListener("click", dismissInflationAlert);
-appShell.addEventListener("scroll", scheduleMobileSnap, { passive: true });
 appShell.addEventListener("touchstart", handleMobileTouchStart, { passive: true });
 appShell.addEventListener("touchend", handleMobileTouchEnd, { passive: true });
 appShell.addEventListener("touchcancel", handleMobileTouchCancel, { passive: true });
+appShell.addEventListener("wheel", handleMobileWheel, { passive: false });
 window.addEventListener("resize", () => {
   if (isMobilePager()) {
-    snapMobilePage();
+    snapMobilePage(currentMobilePage(), "auto");
   } else {
     updateMobilePageIndicator();
   }
@@ -2022,5 +2021,5 @@ applyParams(readSavedParams());
 renderIncomeSteps();
 renderChildBirthRows();
 updateUI({ persist: false });
-appShell.scrollLeft = 0;
+setMobilePage(0, "auto");
 updateMobilePageIndicator();
