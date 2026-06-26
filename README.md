@@ -41,16 +41,13 @@ styles.css
 script.js
 ```
 
-## 发布到 GitHub Pages
+## 在线访问
 
-这个项目是静态网页，适合直接使用 GitHub Pages 发布。
+直接访问：
 
-1. 新建一个 GitHub 仓库
-2. 上传本项目文件
-3. 在仓库中进入 `Settings` -> `Pages`
-4. `Source` 选择 `Deploy from a branch`
-5. 分支选择 `main`，目录选择 `/ (root)`
-6. 保存后等待 GitHub Pages 生成访问地址
+```text
+https://money.zx8592.top/
+```
 
 ## 计算假设
 
