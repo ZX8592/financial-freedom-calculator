@@ -4,9 +4,9 @@ const DEFAULTS = {
   monthlyIncome: 20000,
   monthlyExpense: 9000,
   passiveIncome: 0,
-  initialAssets: 50000,
-  workReturn: 5,
-  retireReturn: 4,
+  initialAssets: 0,
+  workReturn: 2,
+  retireReturn: 1,
   oneTimeGoal: 0,
   legacyGoal: 0,
   safetyMargin: 10,
@@ -94,6 +94,10 @@ let childBirthAges = [DEFAULTS.childAge];
 let latestResult = null;
 let boardGenerated = false;
 let mobileSnapTimer = 0;
+let mobileTouchActive = false;
+let mobileTouchStartX = 0;
+let mobileTouchStartPage = 0;
+let mobileSnapLockedUntil = 0;
 
 function toNumber(value, fallback = 0) {
   const number = Number.parseFloat(value);
@@ -380,27 +384,72 @@ function currentMobilePage() {
   return appShell.scrollLeft > maxScroll / 2 ? 1 : 0;
 }
 
-function updateMobilePageIndicator() {
+function updateMobilePageIndicator(page = currentMobilePage()) {
   if (!mobilePageDots.length) return;
-  const page = currentMobilePage();
   mobilePageDots.forEach((dot, index) => {
     dot.classList.toggle("active", index === page);
   });
 }
 
-function snapMobilePage() {
+function setMobilePage(page, behavior = "smooth") {
   if (!isMobilePager() || !appShell) return;
   const maxScroll = mobileMaxScroll();
-  const target = currentMobilePage() === 1 ? maxScroll : 0;
-  appShell.scrollTo({ left: target, behavior: "smooth" });
-  updateMobilePageIndicator();
+  const safePage = page === 1 ? 1 : 0;
+  const target = safePage === 1 ? maxScroll : 0;
+  appShell.scrollTo({ left: target, behavior });
+  updateMobilePageIndicator(safePage);
+}
+
+function snapMobilePage(page = currentMobilePage(), behavior = "smooth") {
+  setMobilePage(page, behavior);
 }
 
 function scheduleMobileSnap() {
   if (!isMobilePager()) return;
+  if (mobileTouchActive || Date.now() < mobileSnapLockedUntil) {
+    updateMobilePageIndicator();
+    return;
+  }
   window.clearTimeout(mobileSnapTimer);
   mobileSnapTimer = window.setTimeout(snapMobilePage, 120);
   updateMobilePageIndicator();
+}
+
+function mobileSwipeThreshold() {
+  if (!appShell) return 56;
+  return clamp(appShell.clientWidth * 0.18, 48, 82);
+}
+
+function handleMobileTouchStart(event) {
+  if (!isMobilePager() || !event.touches.length) return;
+  mobileTouchActive = true;
+  mobileTouchStartX = event.touches[0].clientX;
+  mobileTouchStartPage = currentMobilePage();
+  window.clearTimeout(mobileSnapTimer);
+  updateMobilePageIndicator(mobileTouchStartPage);
+}
+
+function handleMobileTouchEnd(event) {
+  if (!isMobilePager() || !mobileTouchActive) return;
+  const touch = event.changedTouches[0];
+  const deltaX = touch ? touch.clientX - mobileTouchStartX : 0;
+  const threshold = mobileSwipeThreshold();
+  let targetPage = mobileTouchStartPage;
+
+  if (Math.abs(deltaX) >= threshold) {
+    targetPage = deltaX < 0 ? 1 : 0;
+  }
+
+  mobileTouchActive = false;
+  mobileSnapLockedUntil = Date.now() + 360;
+  snapMobilePage(targetPage);
+}
+
+function handleMobileTouchCancel() {
+  if (!isMobilePager() || !mobileTouchActive) return;
+  mobileTouchActive = false;
+  mobileSnapLockedUntil = Date.now() + 360;
+  snapMobilePage(mobileTouchStartPage);
 }
 
 function numberValue(id) {
@@ -1954,7 +2003,9 @@ document.addEventListener("keydown", (event) => {
 });
 dismissInflationAlertButton.addEventListener("click", dismissInflationAlert);
 appShell.addEventListener("scroll", scheduleMobileSnap, { passive: true });
-appShell.addEventListener("touchend", snapMobilePage, { passive: true });
+appShell.addEventListener("touchstart", handleMobileTouchStart, { passive: true });
+appShell.addEventListener("touchend", handleMobileTouchEnd, { passive: true });
+appShell.addEventListener("touchcancel", handleMobileTouchCancel, { passive: true });
 window.addEventListener("resize", () => {
   if (isMobilePager()) {
     snapMobilePage();
