@@ -101,6 +101,7 @@ let mobileTouchStartY = 0;
 let mobileTouchStartPage = 0;
 let mobileTouchDeltaX = 0;
 let mobilePage = 0;
+let mobileTouchCleanupTimer = 0;
 
 function toNumber(value, fallback = 0) {
   const number = Number.parseFloat(value);
@@ -390,9 +391,11 @@ function updateMobilePageIndicator(page = currentMobilePage()) {
 function setMobilePage(page, behavior = "smooth") {
   if (!isMobilePager() || !appShell) return;
   const safePage = page === 1 ? 1 : 0;
+  window.clearTimeout(mobileTouchCleanupTimer);
   mobilePage = safePage;
   appShell.dataset.mobilePage = String(safePage);
   appShell.style.transform = "";
+  appShell.classList.remove("is-dragging");
   appShell.classList.toggle("no-page-transition", behavior === "auto");
   updateMobilePageIndicator(safePage);
   if (behavior === "auto") {
@@ -414,8 +417,8 @@ function constrainMobileDrag(deltaX, page) {
 }
 
 function mobileSwipeThreshold() {
-  if (!appShell) return 96;
-  return clamp(appShell.clientWidth * 0.26, 88, 128);
+  if (!appShell) return 140;
+  return clamp(appShell.clientWidth * 0.42, 140, 220);
 }
 
 function handleMobileTouchStart(event) {
@@ -427,6 +430,7 @@ function handleMobileTouchStart(event) {
   mobileTouchStartY = event.touches[0].clientY;
   mobileTouchStartPage = currentMobilePage();
   mobileTouchDeltaX = 0;
+  window.clearTimeout(mobileTouchCleanupTimer);
   appShell.classList.remove("is-dragging");
   appShell.style.transform = "";
   updateMobilePageIndicator(mobileTouchStartPage);
@@ -454,39 +458,41 @@ function handleMobileTouchMove(event) {
   }
 
   event.preventDefault();
-  mobileTouchDeltaX = deltaX;
-  const offset = mobilePageOffset(mobileTouchStartPage) + constrainMobileDrag(deltaX, mobileTouchStartPage);
+  mobileTouchDeltaX = constrainMobileDrag(deltaX, mobileTouchStartPage);
+  const offset = mobilePageOffset(mobileTouchStartPage) + mobileTouchDeltaX;
   appShell.style.transform = `translateX(${offset}px)`;
 }
 
 function finishMobileTouch(targetPage) {
-  const heldTransform = appShell.style.transform;
+  const safePage = targetPage === 1 ? 1 : 0;
+  const startOffset = mobilePageOffset(mobileTouchStartPage) + mobileTouchDeltaX;
+  const endOffset = mobilePageOffset(safePage);
   mobileTouchActive = false;
   mobileTouchDragging = false;
   mobileTouchLockedVertical = false;
-  mobileTouchDeltaX = 0;
 
-  mobilePage = targetPage === 1 ? 1 : 0;
+  mobilePage = safePage;
   appShell.dataset.mobilePage = String(mobilePage);
   updateMobilePageIndicator(mobilePage);
   appShell.classList.remove("is-dragging");
+  appShell.style.transform = `translateX(${startOffset}px)`;
+  appShell.getBoundingClientRect();
+  appShell.style.transform = `translateX(${endOffset}px)`;
 
-  if (heldTransform) {
-    appShell.style.transform = heldTransform;
-    appShell.getBoundingClientRect();
-  }
-  appShell.style.transform = "";
+  window.clearTimeout(mobileTouchCleanupTimer);
+  mobileTouchCleanupTimer = window.setTimeout(() => {
+    if (!mobileTouchActive) appShell.style.transform = "";
+  }, 280);
+  mobileTouchDeltaX = 0;
 }
 
 function handleMobileTouchEnd(event) {
   if (!isMobilePager() || !mobileTouchActive) return;
-  const touch = event.changedTouches[0];
-  const deltaX = touch ? touch.clientX - mobileTouchStartX : mobileTouchDeltaX;
-  const deltaY = touch ? touch.clientY - mobileTouchStartY : 0;
+  const deltaX = mobileTouchDeltaX;
   const threshold = mobileSwipeThreshold();
   let targetPage = mobileTouchStartPage;
 
-  if (mobileTouchDragging && Math.abs(deltaX) >= threshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.15) {
+  if (mobileTouchDragging && Math.abs(deltaX) >= threshold) {
     targetPage = deltaX < 0 ? 1 : 0;
   }
 
