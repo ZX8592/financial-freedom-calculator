@@ -855,6 +855,10 @@ canvas {
     transition: none;
   }
 
+  .app-shell.is-dragging {
+    transition: none;
+  }
+
   .input-panel,
   .result-panel {
     flex: 0 0 calc(100vw - 24px);
