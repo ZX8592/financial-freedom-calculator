@@ -93,15 +93,7 @@ let incomeSteps = [];
 let childBirthAges = [DEFAULTS.childAge];
 let latestResult = null;
 let boardGenerated = false;
-let mobileTouchActive = false;
-let mobileTouchDragging = false;
-let mobileTouchLockedVertical = false;
-let mobileTouchStartX = 0;
-let mobileTouchStartY = 0;
-let mobileTouchStartPage = 0;
-let mobileTouchDeltaX = 0;
 let mobilePage = 0;
-let mobileTouchCleanupTimer = 0;
 
 function toNumber(value, fallback = 0) {
   const number = Number.parseFloat(value);
@@ -388,126 +380,33 @@ function updateMobilePageIndicator(page = currentMobilePage()) {
   });
 }
 
+function mobilePageStep() {
+  return appShell ? appShell.clientWidth : window.innerWidth;
+}
+
 function setMobilePage(page, behavior = "smooth") {
   if (!isMobilePager() || !appShell) return;
   const safePage = page === 1 ? 1 : 0;
-  window.clearTimeout(mobileTouchCleanupTimer);
   mobilePage = safePage;
   appShell.dataset.mobilePage = String(safePage);
-  appShell.style.transform = "";
-  appShell.classList.remove("is-dragging");
-  appShell.classList.toggle("no-page-transition", behavior === "auto");
   updateMobilePageIndicator(safePage);
-  if (behavior === "auto") {
-    window.setTimeout(() => appShell.classList.remove("no-page-transition"), 0);
-  }
+  appShell.scrollTo({
+    left: mobilePageStep() * safePage,
+    behavior: behavior === "auto" ? "auto" : "smooth",
+  });
 }
 
 function snapMobilePage(page = currentMobilePage(), behavior = "smooth") {
   setMobilePage(page, behavior);
 }
 
-function mobilePageOffset(page) {
-  return page === 1 ? -window.innerWidth : 0;
-}
-
-function constrainMobileDrag(deltaX, page) {
-  if (page === 0) return Math.min(deltaX, 0);
-  return Math.max(deltaX, 0);
-}
-
-function mobileSwipeThreshold() {
-  if (!appShell) return 140;
-  return clamp(appShell.clientWidth * 0.42, 140, 220);
-}
-
-function handleMobileTouchStart(event) {
-  if (!isMobilePager() || !event.touches.length) return;
-  mobileTouchActive = true;
-  mobileTouchDragging = false;
-  mobileTouchLockedVertical = false;
-  mobileTouchStartX = event.touches[0].clientX;
-  mobileTouchStartY = event.touches[0].clientY;
-  mobileTouchStartPage = currentMobilePage();
-  mobileTouchDeltaX = 0;
-  window.clearTimeout(mobileTouchCleanupTimer);
-  appShell.classList.remove("is-dragging");
-  appShell.style.transform = "";
-  updateMobilePageIndicator(mobileTouchStartPage);
-}
-
-function handleMobileTouchMove(event) {
-  if (!isMobilePager() || !mobileTouchActive || !event.touches.length) return;
-
-  const touch = event.touches[0];
-  const deltaX = touch.clientX - mobileTouchStartX;
-  const deltaY = touch.clientY - mobileTouchStartY;
-  const absX = Math.abs(deltaX);
-  const absY = Math.abs(deltaY);
-
-  if (mobileTouchLockedVertical) return;
-
-  if (!mobileTouchDragging) {
-    if (absY > 10 && absY > absX) {
-      mobileTouchLockedVertical = true;
-      return;
-    }
-    if (absX < 12 || absX <= absY * 1.15) return;
-    mobileTouchDragging = true;
-    appShell.classList.add("is-dragging");
-  }
-
-  event.preventDefault();
-  mobileTouchDeltaX = constrainMobileDrag(deltaX, mobileTouchStartPage);
-  const offset = mobilePageOffset(mobileTouchStartPage) + mobileTouchDeltaX;
-  appShell.style.transform = `translateX(${offset}px)`;
-}
-
-function finishMobileTouch(targetPage) {
-  const safePage = targetPage === 1 ? 1 : 0;
-  const startOffset = mobilePageOffset(mobileTouchStartPage) + mobileTouchDeltaX;
-  const endOffset = mobilePageOffset(safePage);
-  mobileTouchActive = false;
-  mobileTouchDragging = false;
-  mobileTouchLockedVertical = false;
-
-  mobilePage = safePage;
-  appShell.dataset.mobilePage = String(mobilePage);
-  updateMobilePageIndicator(mobilePage);
-  appShell.classList.remove("is-dragging");
-  appShell.style.transform = `translateX(${startOffset}px)`;
-  appShell.getBoundingClientRect();
-  appShell.style.transform = `translateX(${endOffset}px)`;
-
-  window.clearTimeout(mobileTouchCleanupTimer);
-  mobileTouchCleanupTimer = window.setTimeout(() => {
-    if (!mobileTouchActive) appShell.style.transform = "";
-  }, 280);
-  mobileTouchDeltaX = 0;
-}
-
-function handleMobileTouchEnd(event) {
-  if (!isMobilePager() || !mobileTouchActive) return;
-  const deltaX = mobileTouchDeltaX;
-  const threshold = mobileSwipeThreshold();
-  let targetPage = mobileTouchStartPage;
-
-  if (mobileTouchDragging && Math.abs(deltaX) >= threshold) {
-    targetPage = deltaX < 0 ? 1 : 0;
-  }
-
-  if (mobileTouchDragging) {
-    finishMobileTouch(targetPage);
-    return;
-  }
-
-  mobileTouchActive = false;
-  mobileTouchLockedVertical = false;
-}
-
-function handleMobileTouchCancel() {
-  if (!isMobilePager() || !mobileTouchActive) return;
-  finishMobileTouch(mobileTouchStartPage);
+function handleMobileScroll() {
+  if (!isMobilePager() || !appShell) return;
+  const nextPage = appShell.scrollLeft >= mobilePageStep() / 2 ? 1 : 0;
+  if (nextPage === mobilePage) return;
+  mobilePage = nextPage;
+  appShell.dataset.mobilePage = String(nextPage);
+  updateMobilePageIndicator(nextPage);
 }
 
 function numberValue(id) {
@@ -2060,16 +1959,12 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setPresetPanelOpen(false);
 });
 dismissInflationAlertButton.addEventListener("click", dismissInflationAlert);
-appShell.addEventListener("touchstart", handleMobileTouchStart, { passive: true });
-appShell.addEventListener("touchmove", handleMobileTouchMove, { passive: false });
-appShell.addEventListener("touchend", handleMobileTouchEnd, { passive: true });
-appShell.addEventListener("touchcancel", handleMobileTouchCancel, { passive: true });
+appShell.addEventListener("scroll", handleMobileScroll, { passive: true });
 window.addEventListener("resize", () => {
   if (isMobilePager()) {
     snapMobilePage(currentMobilePage(), "auto");
   } else {
-    appShell.classList.remove("is-dragging", "no-page-transition");
-    appShell.style.transform = "";
+    appShell.scrollLeft = 0;
     updateMobilePageIndicator();
   }
 });

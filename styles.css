@@ -836,27 +836,22 @@ canvas {
 
   .app-shell {
     display: flex;
-    gap: 0;
+    gap: 24px;
     width: 100vw;
     margin: 0;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
     padding: 12px;
-    touch-action: pan-y;
-    transform: translateX(0);
-    transition: transform 260ms ease;
-    will-change: transform;
+    scroll-behavior: smooth;
+    scroll-padding: 12px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .app-shell[data-mobile-page="1"] {
-    transform: translateX(-100vw);
-  }
-
-  .app-shell.no-page-transition {
-    transition: none;
-  }
-
-  .app-shell.is-dragging {
-    transition: none;
+  .app-shell::-webkit-scrollbar {
+    display: none;
   }
 
   .input-panel,
@@ -865,10 +860,12 @@ canvas {
     width: calc(100vw - 24px);
     min-width: calc(100vw - 24px);
     padding: 16px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .input-panel {
-    margin-right: 24px;
+    margin-right: 0;
   }
 
   .status-card,
@@ -921,7 +918,7 @@ canvas {
   .mobile-page-indicator {
     position: fixed;
     right: 0;
-    bottom: 10px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
     left: 0;
     z-index: 20;
     display: flex;
